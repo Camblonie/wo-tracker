@@ -15,6 +15,13 @@
       "instructions": "Set bench to 30-45 degree angle. Press bar from upper chest to full extension."
     },
     {
+      "id": "incline-dumbbell-press",
+      "name": "Incline Dumbbell Press",
+      "category": "Chest",
+      "muscleGroups": ["Upper Chest", "Shoulders", "Triceps"],
+      "instructions": "Set bench to 30-45 degree angle. Start with dumbbells at shoulder height, palms facing forward. Press dumbbells up and together, then lower with control."
+    },
+    {
       "id": "dumbbell-flyes",
       "name": "Dumbbell Flyes",
       "category": "Chest",

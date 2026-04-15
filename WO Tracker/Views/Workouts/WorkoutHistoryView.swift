@@ -80,6 +80,16 @@ struct WorkoutHistoryView: View {
     private func deleteSessions(in sectionSessions: [WorkoutSession], at offsets: IndexSet) {
         for index in offsets {
             let session = sectionSessions[index]
+            
+            // Also delete associated workout logs
+            if let logs = session.completedMovements?.flatMap({ $0.exercise?.logs ?? [] }) {
+                for log in logs {
+                    if log.sessionID == session.id {
+                        modelContext.delete(log)
+                    }
+                }
+            }
+            
             modelContext.delete(session)
         }
     }
@@ -150,6 +160,7 @@ struct SessionRow: View {
 
 struct SessionDetailView: View {
     let session: WorkoutSession
+    @State private var showingEditSheet = false
     
     var totalVolume: Double {
         (session.completedMovements ?? []).reduce(0) { $0 + $1.totalVolume }
@@ -217,6 +228,18 @@ struct SessionDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Workout Details")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showingEditSheet = true
+                } label: {
+                    Text("Edit")
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditSheet) {
+            EditWorkoutView(session: session)
+        }
     }
 }
 

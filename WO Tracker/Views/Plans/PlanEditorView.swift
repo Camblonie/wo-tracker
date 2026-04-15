@@ -111,6 +111,10 @@ struct PlanEditorView: View {
                     }
                 }
                 
+                ToolbarItem(placement: .navigationBarLeading) {
+                    EditButton()
+                }
+                
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         savePlan()

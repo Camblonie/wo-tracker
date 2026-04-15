@@ -12,10 +12,13 @@ struct WorkoutsTabView: View {
     @Environment(\.modelContext) private var modelContext
     
     @Query(sort: \WorkoutPlan.createdAt, order: .reverse) private var plans: [WorkoutPlan]
+    @Query(filter: #Predicate<Exercise> { $0.name == "Push-ups" }) private var pushUpExercise: [Exercise]
     
     @State private var showingActiveWorkout = false
     @State private var selectedPlan: WorkoutPlan?
     @State private var showingPlanPicker = false
+    @State private var showingQuickPushUp = false
+    @State private var pushUpCount = ""
     
     var body: some View {
         NavigationStack {
@@ -28,6 +31,9 @@ struct WorkoutsTabView: View {
                     },
                     onFromPlan: {
                         showingPlanPicker = true
+                    },
+                    onQuickPushUp: {
+                        showingQuickPushUp = true
                     }
                 )
                 
@@ -49,7 +55,69 @@ struct WorkoutsTabView: View {
                     showingActiveWorkout = true
                 }
             }
+            .alert("Quick Push-ups", isPresented: $showingQuickPushUp) {
+                TextField("Number of push-ups", text: $pushUpCount)
+                    .keyboardType(.numberPad)
+                Button("Cancel", role: .cancel) {
+                    pushUpCount = ""
+                }
+                Button("Save") {
+                    recordQuickPushUps()
+                }
+            } message: {
+                Text("How many push-ups did you do?")
+            }
         }
+    }
+    
+    private func recordQuickPushUps() {
+        guard let count = Int(pushUpCount), count > 0 else { return }
+        
+        // Create a completed workout session
+        let session = WorkoutSession(
+            plan: nil,
+            startedAt: Date(),
+            completedAt: Date(),
+            status: .completed,
+            notes: "Quick push-up session: \(count) reps"
+        )
+        modelContext.insert(session)
+        
+        // Find or get push-up exercise
+        let exercise = pushUpExercise.first
+        
+        // Create completed movement
+        let movement = CompletedMovement(
+            exercise: exercise,
+            session: session,
+            orderIndex: 0,
+            startedAt: Date(),
+            completedAt: Date()
+        )
+        modelContext.insert(movement)
+        
+        // Create the set
+        let set = ExerciseSet(
+            setNumber: 1,
+            reps: count,
+            weight: 0,
+            isCompleted: true,
+            completedMovement: movement
+        )
+        modelContext.insert(set)
+        
+        // Create workout log
+        let log = WorkoutLog(
+            exercise: exercise,
+            date: Date(),
+            weight: 0,
+            reps: count,
+            sets: 1,
+            sessionID: session.id
+        )
+        modelContext.insert(log)
+        
+        pushUpCount = ""
     }
 }
 
@@ -58,6 +126,7 @@ struct WorkoutsTabView: View {
 struct QuickStartSection: View {
     let onFreeWorkout: () -> Void
     let onFromPlan: () -> Void
+    let onQuickPushUp: () -> Void
     
     var body: some View {
         VStack(spacing: 20) {
@@ -114,6 +183,29 @@ struct QuickStartSection: View {
                     .foregroundColor(.primary)
                     .padding()
                     .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                
+                // Quick Push-up button
+                Button {
+                    onQuickPushUp()
+                } label: {
+                    HStack {
+                        Image(systemName: "figure.strengthtraining.traditional")
+                            .font(.title2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Quick Push-ups")
+                                .font(.headline)
+                            Text("Log push-ups instantly")
+                                .font(.caption)
+                                .foregroundColor(.primary.opacity(0.6))
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundColor(.primary)
+                    .padding()
+                    .background(Color.green.opacity(0.15))
                     .cornerRadius(12)
                 }
             }
@@ -201,38 +293,43 @@ struct PreviewSessionRow: View {
     let session: WorkoutSession
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                if let plan = session.plan {
-                    Text(plan.name)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                } else {
-                    Text("Free Workout")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+        NavigationLink {
+            SessionDetailView(session: session)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let plan = session.plan {
+                        Text(plan.name)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                    } else {
+                        Text("Free Workout")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Text(session.startedAt, format: .dateTime.weekday().month().day())
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
-                Text(session.startedAt, format: .dateTime.weekday().month().day())
-                    .font(.caption)
+                Spacer()
+                
+                if let duration = session.durationMinutes {
+                    HStack(spacing: 2) {
+                        Image(systemName: "clock")
+                            .font(.caption2)
+                        Text("\(duration)m")
+                            .font(.caption)
+                    }
                     .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            if let duration = session.durationMinutes {
-                HStack(spacing: 2) {
-                    Image(systemName: "clock")
-                        .font(.caption2)
-                    Text("\(duration)m")
-                        .font(.caption)
                 }
-                .foregroundColor(.secondary)
             }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(10)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(10)
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

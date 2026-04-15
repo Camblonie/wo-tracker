@@ -192,38 +192,50 @@ struct ActiveWorkoutView: View {
         modelContext.insert(newSession)
         session = newSession
         
+        // Create history service for looking up previous performances
+        let historyService = WorkoutHistoryService(modelContext: modelContext)
+        
         // Initialize movements from plan or start empty
         if let plan = plan {
             movements = plan.sortedMovements.enumerated().map { index, planned in
-                ActiveMovementInput(
+                // Get sets pre-populated from last workout or use plan defaults
+                let sets = historyService.createSetsFromHistory(
+                    targetSets: planned.targetSets,
+                    targetReps: planned.targetReps,
+                    targetWeight: planned.targetWeight,
+                    for: planned.exercise
+                )
+                
+                return ActiveMovementInput(
                     orderIndex: index,
                     exercise: planned.exercise,
                     targetSets: planned.targetSets,
                     targetReps: planned.targetReps,
                     targetWeight: planned.targetWeight,
-                    sets: (1...planned.targetSets).map { setNumber in
-                        ExerciseSetInput(
-                            setNumber: setNumber,
-                            reps: planned.targetReps,
-                            weight: planned.targetWeight ?? 0
-                        )
-                    }
+                    sets: sets
                 )
             }
         }
     }
     
     private func addMovement(for exercise: Exercise) {
+        // Create history service for looking up previous performances
+        let historyService = WorkoutHistoryService(modelContext: modelContext)
+        
+        // Get sets pre-populated from last workout or use defaults
+        let sets = historyService.createSetsFromHistory(
+            targetSets: 3,
+            targetReps: 10,
+            targetWeight: 0,
+            for: exercise
+        )
+        
         let newMovement = ActiveMovementInput(
             orderIndex: movements.count,
             exercise: exercise,
             targetSets: 3,
             targetReps: 10,
-            sets: [
-                ExerciseSetInput(setNumber: 1, reps: 10, weight: 0),
-                ExerciseSetInput(setNumber: 2, reps: 10, weight: 0),
-                ExerciseSetInput(setNumber: 3, reps: 10, weight: 0)
-            ]
+            sets: sets
         )
         movements.append(newMovement)
         

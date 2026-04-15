@@ -16,51 +16,83 @@ struct PlanDetailView: View {
     
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirmation = false
+    @State private var isReordering = false
+    @State private var orderedMovements: [PlannedMovement] = []
+    @State private var showingActiveWorkout = false
     
-    var body: some View {
-        List {
-            // Header section
+    // MARK: - View Sections
+    
+    @ViewBuilder
+    private var reorderingSection: some View {
+        if isReordering {
             Section {
-                VStack(alignment: .leading, spacing: 12) {
+                Button {
+                    saveReorderedMovements()
+                    isReordering = false
+                } label: {
                     HStack {
-                        Text(plan.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        Spacer()
-                        
-                        if let duration = plan.estimatedDuration {
-                            HStack(spacing: 4) {
-                                Image(systemName: "clock.fill")
-                                    .foregroundColor(.orange)
-                                Text("\(duration) min")
-                                    .font(.headline)
-                                    .foregroundColor(.orange)
-                            }
-                        }
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Done Reordering")
                     }
+                    .foregroundColor(.green)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var headerSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(plan.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
                     
-                    if let details = plan.details, !details.isEmpty {
-                        Text(details)
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                    }
+                    Spacer()
                     
-                    if let lastPerformed = plan.lastPerformed {
+                    if let duration = plan.estimatedDuration {
                         HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Last performed: \(lastPerformed, format: .dateTime.month().day().year())")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            Image(systemName: "clock.fill")
+                                .foregroundColor(.orange)
+                            Text("\(duration) min")
+                                .font(.headline)
+                                .foregroundColor(.orange)
                         }
-                        .padding(.top, 4)
                     }
                 }
-                .padding(.vertical, 8)
+                
+                if let details = plan.details, !details.isEmpty {
+                    Text(details)
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                }
+                
+                if let lastPerformed = plan.lastPerformed {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Last performed: \(lastPerformed, format: .dateTime.month().day().year())")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 4)
+                }
             }
-            
-            // Exercises section
+            .padding(.vertical, 8)
+        }
+    }
+    
+    @ViewBuilder
+    private var exercisesSection: some View {
+        if isReordering {
+            Section("Exercises (\(orderedMovements.count))") {
+                ForEach(Array(orderedMovements.enumerated()), id: \.element.id) { index, movement in
+                    PlannedMovementRow(index: index + 1, movement: movement, isReordering: true)
+                }
+                .onMove(perform: moveMovement)
+            }
+        } else {
             Section("Exercises (\(plan.sortedMovements.count))") {
                 if plan.sortedMovements.isEmpty {
                     Text("No exercises added yet")
@@ -69,51 +101,78 @@ struct PlanDetailView: View {
                         .italic()
                 } else {
                     ForEach(Array(plan.sortedMovements.enumerated()), id: \.element.id) { index, movement in
-                        PlannedMovementRow(index: index + 1, movement: movement)
+                        PlannedMovementRow(index: index + 1, movement: movement, isReordering: false)
                     }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var actionsSection: some View {
+        Section {
+            Button {
+                showingActiveWorkout = true
+            } label: {
+                HStack {
+                    Image(systemName: "play.fill")
+                    Text("Start Workout")
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+            .listRowBackground(Color.blue)
+            
+            Button {
+                showingEditSheet = true
+            } label: {
+                HStack {
+                    Image(systemName: "pencil")
+                    Text("Edit Plan")
                 }
             }
             
-            // Actions section
-            Section {
-                Button {
-                    // TODO: Start workout with this plan
-                } label: {
-                    HStack {
-                        Image(systemName: "play.fill")
-                        Text("Start Workout")
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+            Button {
+                if !isReordering {
+                    orderedMovements = plan.sortedMovements
                 }
-                .listRowBackground(Color.blue)
-                
-                Button {
-                    showingEditSheet = true
-                } label: {
-                    HStack {
-                        Image(systemName: "pencil")
-                        Text("Edit Plan")
-                    }
+                isReordering.toggle()
+            } label: {
+                HStack {
+                    Image(systemName: isReordering ? "xmark.circle" : "arrow.up.arrow.down")
+                    Text(isReordering ? "Cancel Reorder" : "Reorder Exercises")
                 }
-                
-                Button {
-                    showingDeleteConfirmation = true
-                } label: {
-                    HStack {
-                        Image(systemName: "trash")
-                        Text("Delete Plan")
-                    }
-                    .foregroundColor(.red)
-                }
+                .foregroundColor(isReordering ? .orange : .blue)
             }
+            
+            Button {
+                showingDeleteConfirmation = true
+            } label: {
+                HStack {
+                    Image(systemName: "trash")
+                    Text("Delete Plan")
+                }
+                .foregroundColor(.red)
+            }
+        }
+    }
+    
+    var body: some View {
+        List {
+            reorderingSection
+            headerSection
+            exercisesSection
+            actionsSection
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Plan Details")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingEditSheet) {
             PlanEditorView(plan: plan)
+        }
+        .sheet(isPresented: $showingActiveWorkout) {
+            ActiveWorkoutView(plan: plan)
         }
         .alert("Delete Workout Plan?", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -129,6 +188,24 @@ struct PlanDetailView: View {
         modelContext.delete(plan)
         dismiss()
     }
+    
+    private func moveMovement(from source: IndexSet, to destination: Int) {
+        orderedMovements.move(fromOffsets: source, toOffset: destination)
+    }
+    
+    private func saveReorderedMovements() {
+        // Update orderIndex for all movements
+        for (index, movement) in orderedMovements.enumerated() {
+            movement.orderIndex = index
+        }
+        
+        // Save changes
+        do {
+            try modelContext.save()
+        } catch {
+            print("Failed to save reordered movements: \(error)")
+        }
+    }
 }
 
 // MARK: - Supporting Views
@@ -136,17 +213,24 @@ struct PlanDetailView: View {
 struct PlannedMovementRow: View {
     let index: Int
     let movement: PlannedMovement
+    var isReordering: Bool = false
     
     var body: some View {
         HStack(spacing: 12) {
-            // Order number
-            Text("\(index)")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-                .frame(width: 24, height: 24)
-                .background(categoryColor)
-                .clipShape(Circle())
+            // Order number or drag handle
+            if isReordering {
+                Image(systemName: "line.3.horizontal")
+                    .foregroundColor(.secondary)
+                    .frame(width: 24, height: 24)
+            } else {
+                Text("\(index)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(width: 24, height: 24)
+                    .background(categoryColor)
+                    .clipShape(Circle())
+            }
             
             VStack(alignment: .leading, spacing: 4) {
                 if let exercise = movement.exercise {
